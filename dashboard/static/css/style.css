@@ -1,0 +1,41 @@
+body {
+  background-color: #f4f6f9;
+}
+
+.login-body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a2a4a, #0d6efd);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border: none;
+  border-radius: 12px;
+}
+
+.summary-card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.card-header {
+  background-color: #fff;
+  font-weight: 600;
+  border-bottom: 1px solid #eee;
+}
+
+.navbar-brand {
+  font-weight: 700;
+}
+
+code {
+  word-break: break-all;
+}

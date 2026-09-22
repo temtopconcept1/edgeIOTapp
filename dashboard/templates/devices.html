@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Devices — SSEMS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Registered Devices</h3>
+  {% if role == 'admin' %}
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newDeviceModal">
+    + Register New Device
+  </button>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Device Name</th><th>Device UID</th><th>Status</th><th>Last Seen</th>
+          {% if role == 'admin' %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="devices-tbody">
+        <tr><td colspan="5" class="text-muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if role == 'admin' %}
+<div class="modal fade" id="newDeviceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Register New Device</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Device Name</label>
+          <input type="text" id="new-device-name" class="form-control" placeholder="e.g. Warehouse Sensor 2" maxlength="100">
+        </div>
+        <div id="new-device-result"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-primary" onclick="registerDevice()">Register</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const role = "{{ role }}";
+
+async function loadDevices() {
+  const rows = await ssemsFetch('/api/devices');
+  if (!rows) return;
+  const tbody = document.getElementById('devices-tbody');
+  tbody.innerHTML = '';
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No devices registered yet.</td></tr>';
+    return;
+  }
+  rows.forEach(d => {
+    const statusBadge = d.status === 'active' ? 'success' : (d.status === 'suspicious' ? 'danger' : 'secondary');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.device_name}</td>
+      <td><code>${d.device_uid}</code></td>
+      <td><span class="badge bg-${statusBadge}">${d.status}</span></td>
+      <td>${d.last_seen || '—'}</td>
+      ${role === 'admin' ? `<td>
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleDevice('${d.device_uid}','${d.status}')">
+          ${d.status === 'active' ? 'Deactivate' : 'Activate'}
+        </button></td>` : ''}
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function toggleDevice(uid, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  await ssemsFetch(`/api/devices/${uid}/status`, { method: 'POST', body: JSON.stringify({status: newStatus}) });
+  loadDevices();
+}
+
+async function registerDevice() {
+  const name = document.getElementById('new-device-name').value.trim();
+  const resultDiv = document.getElementById('new-device-result');
+  if (!name) { resultDiv.innerHTML = '<div class="alert alert-warning py-2">Enter a device name.</div>'; return; }
+  const res = await ssemsFetch('/api/devices', { method: 'POST', body: JSON.stringify({device_name: name}) });
+  if (res) {
+    resultDiv.innerHTML = `<div class="alert alert-success py-2">
+      <strong>Device UID:</strong> <code>${res.device_uid}</code><br>
+      <strong>Device Secret:</strong> <code>${res.device_secret}</code><br>
+      <small>${res.warning}</small></div>`;
+    loadDevices();
+  }
+}
+
+loadDevices();
+setInterval(loadDevices, 6000);
+</script>
+{% endblock %}

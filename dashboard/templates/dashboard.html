@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Overview — SSEMS{% endblock %}
+{% block content %}
+<h3 class="mb-4">System Overview</h3>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card">
+      <div class="card-body">
+        <div class="text-muted small">Total Devices</div>
+        <div class="fs-2 fw-bold" id="card-total-devices">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card">
+      <div class="card-body">
+        <div class="text-muted small">Active Devices</div>
+        <div class="fs-2 fw-bold text-success" id="card-active-devices">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card">
+      <div class="card-body">
+        <div class="text-muted small">Unresolved Alerts</div>
+        <div class="fs-2 fw-bold text-danger" id="card-unresolved-alerts">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card summary-card">
+      <div class="card-body">
+        <div class="text-muted small">Readings Today</div>
+        <div class="fs-2 fw-bold" id="card-readings-today">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Live Sensor Trend (most recent readings, all devices)</div>
+      <div class="card-body">
+        <canvas id="trendChart" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Recent Alerts</div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush" id="recent-alerts-list">
+          <li class="list-group-item text-muted">Loading…</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSummary() {
+  const data = await ssemsFetch('/api/summary');
+  if (!data) return;
+  document.getElementById('card-total-devices').textContent = data.total_devices;
+  document.getElementById('card-active-devices').textContent = data.active_devices;
+  document.getElementById('card-unresolved-alerts').textContent = data.unresolved_alerts;
+  document.getElementById('card-readings-today').textContent = data.readings_today;
+}
+
+let trendChart;
+async function loadTrend() {
+  const rows = await ssemsFetch('/api/sensor-data?limit=40');
+  if (!rows) return;
+  const labels = rows.map(r => new Date(r.recorded_at + 'Z').toLocaleTimeString());
+  const temps = rows.map(r => r.temperature);
+  const hums = rows.map(r => r.humidity);
+  if (!trendChart) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Temperature (°C)', data: temps, borderColor: '#dc3545', tension: 0.3 },
+          { label: 'Humidity (%)', data: hums, borderColor: '#0d6efd', tension: 0.3 },
+        ]
+      },
+      options: { animation: false, scales: { y: { beginAtZero: true } } }
+    });
+  } else {
+    trendChart.data.labels = labels;
+    trendChart.data.datasets[0].data = temps;
+    trendChart.data.datasets[1].data = hums;
+    trendChart.update();
+  }
+}
+
+async function loadRecentAlerts() {
+  const rows = await ssemsFetch('/api/alerts?unresolved=1');
+  if (!rows) return;
+  const list = document.getElementById('recent-alerts-list');
+  list.innerHTML = '';
+  if (rows.length === 0) {
+    list.innerHTML = '<li class="list-group-item text-muted">No unresolved alerts.</li>';
+    return;
+  }
+  rows.slice(0, 8).forEach(a => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-start';
+    li.innerHTML = `<div><span class="badge bg-${a.severity === 'high' ? 'danger' : 'warning'} me-2">${a.severity}</span>${a.message}</div>`;
+    list.appendChild(li);
+  });
+}
+
+function refreshAll() { loadSummary(); loadTrend(); loadRecentAlerts(); }
+refreshAll();
+setInterval(refreshAll, 5000);
+</script>
+{% endblock %}

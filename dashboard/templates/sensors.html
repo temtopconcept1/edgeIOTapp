@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Sensor Data — SSEMS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Sensor Data Monitoring</h3>
+  <select id="device-filter" class="form-select form-select-sm w-auto">
+    <option value="">All Devices</option>
+  </select>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Temperature &amp; Humidity Trend</div>
+  <div class="card-body"><canvas id="sensorChart" height="100"></canvas></div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Time</th><th>Device</th><th>Temperature (°C)</th><th>Humidity (%)</th><th>Status</th></tr>
+      </thead>
+      <tbody id="readings-tbody">
+        <tr><td colspan="5" class="text-muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sensorChart;
+let deviceMap = {};
+
+async function loadDeviceOptions() {
+  const rows = await ssemsFetch('/api/devices');
+  if (!rows) return;
+  const select = document.getElementById('device-filter');
+  rows.forEach(d => {
+    deviceMap[d.device_id] = d.device_name;
+    const opt = document.createElement('option');
+    opt.value = d.device_id;
+    opt.textContent = d.device_name;
+    select.appendChild(opt);
+  });
+}
+
+async function loadReadings() {
+  const deviceId = document.getElementById('device-filter').value;
+  const url = deviceId ? `/api/sensor-data?device_id=${deviceId}&limit=60` : '/api/sensor-data?limit=60';
+  const rows = await ssemsFetch(url);
+  if (!rows) return;
+
+  const tbody = document.getElementById('readings-tbody');
+  tbody.innerHTML = '';
+  rows.slice().reverse().forEach(r => {
+    const tr = document.createElement('tr');
+    if (r.status === 'anomalous') tr.classList.add('table-danger');
+    tr.innerHTML = `<td>${r.recorded_at}</td><td>${deviceMap[r.device_id] || r.device_id}</td>
+      <td>${r.temperature}</td><td>${r.humidity}</td>
+      <td><span class="badge bg-${r.status === 'anomalous' ? 'danger' : 'success'}">${r.status}</span></td>`;
+    tbody.appendChild(tr);
+  });
+
+  const labels = rows.map(r => new Date(r.recorded_at + 'Z').toLocaleTimeString());
+  const temps = rows.map(r => r.temperature);
+  const hums = rows.map(r => r.humidity);
+  if (!sensorChart) {
+    const ctx = document.getElementById('sensorChart').getContext('2d');
+    sensorChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [
+        { label: 'Temperature (°C)', data: temps, borderColor: '#dc3545', tension: 0.3 },
+        { label: 'Humidity (%)', data: hums, borderColor: '#0d6efd', tension: 0.3 },
+      ]},
+      options: { animation: false }
+    });
+  } else {
+    sensorChart.data.labels = labels;
+    sensorChart.data.datasets[0].data = temps;
+    sensorChart.data.datasets[1].data = hums;
+    sensorChart.update();
+  }
+}
+
+document.getElementById('device-filter').addEventListener('change', loadReadings);
+loadDeviceOptions().then(loadReadings);
+setInterval(loadReadings, 5000);
+</script>
+{% endblock %}

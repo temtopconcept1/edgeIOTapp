@@ -1,0 +1,8 @@
+Flask>=3.0
+Werkzeug>=3.0
+gunicorn>=21.2   # production WSGI server used on Render (see README)
+
+# Optional, only needed if you swap the simulated in-process broker
+# (edge/mqtt_broker_sim.py) for a real Mosquitto broker as described
+# in README.md, "Moving to a real MQTT broker":
+# paho-mqtt>=1.6

@@ -1,0 +1,29 @@
+# render.yaml
+# Render "Blueprint" — lets you deploy this repo with most settings
+# pre-filled by choosing "New + > Blueprint" on Render and pointing it at
+# this repository, instead of configuring a Web Service by hand.
+# See README.md, "Deploying on Render" for the manual, click-through steps.
+
+services:
+  - type: web
+    name: ssems-prototype
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: SSEMS_SECRET_KEY
+        generateValue: true          # Render generates a random secret for you
+      - key: SSEMS_FORCE_SECURE_COOKIES
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+    # Uncomment the block below (requires a paid Render plan) to persist the
+    # SQLite database across deploys/restarts instead of it resetting each
+    # time on the free plan's ephemeral filesystem:
+    # disk:
+    #   name: ssems-data
+    #   mountPath: /var/data
+    # and add this env var so config.py writes the DB there:
+    #   - key: SSEMS_DB_PATH
+    #     value: /var/data/ssems.db

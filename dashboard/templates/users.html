@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Users — SSEMS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">User Management</h3>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newUserModal">+ Add User</button>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Username</th><th>Role</th><th>Created</th><th>Last Login</th></tr>
+      </thead>
+      <tbody id="users-tbody"><tr><td colspan="4" class="text-muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="newUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add New User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label">Username</label>
+          <input type="text" id="new-username" class="form-control" maxlength="50"></div>
+        <div class="mb-3"><label class="form-label">Password</label>
+          <input type="password" id="new-password" class="form-control" maxlength="128">
+          <div class="form-text">Minimum 8 characters.</div></div>
+        <div class="mb-3"><label class="form-label">Role</label>
+          <select id="new-role" class="form-select">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select></div>
+        <div id="new-user-result"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-primary" onclick="createUser()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadUsers() {
+  const rows = await ssemsFetch('/api/users');
+  if (!rows) return;
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '';
+  rows.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${u.username}</td><td><span class="badge bg-info text-dark">${u.role}</span></td>
+      <td>${u.created_at}</td><td>${u.last_login || 'never'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function createUser() {
+  const username = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-password').value;
+  const role = document.getElementById('new-role').value;
+  const resultDiv = document.getElementById('new-user-result');
+  const res = await ssemsFetch('/api/users', {
+    method: 'POST', body: JSON.stringify({username, password, role})
+  }, true);
+  if (res && res.ok) {
+    resultDiv.innerHTML = '<div class="alert alert-success py-2">User created.</div>';
+    loadUsers();
+  } else if (res && res.data) {
+    resultDiv.innerHTML = `<div class="alert alert-danger py-2">${res.data.message || res.data.error}</div>`;
+  }
+}
+loadUsers();
+</script>
+{% endblock %}

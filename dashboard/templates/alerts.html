@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Alerts & Logs — SSEMS{% endblock %}
+{% block content %}
+<h3 class="mb-3">Security Alerts</h3>
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Time</th><th>Device</th><th>Type</th><th>Severity</th><th>Message</th><th>Status</th>
+        {% if role == 'admin' %}<th></th>{% endif %}</tr>
+      </thead>
+      <tbody id="alerts-tbody"><tr><td colspan="7" class="text-muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+{% if role == 'admin' %}
+<h3 class="mb-3">Audit Log <span class="text-muted small">(administrator only)</span></h3>
+<div class="card">
+  <div class="table-responsive" style="max-height: 420px; overflow-y:auto;">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr>
+      </thead>
+      <tbody id="logs-tbody"><tr><td colspan="4" class="text-muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const role = "{{ role }}";
+
+async function loadAlerts() {
+  const rows = await ssemsFetch('/api/alerts');
+  if (!rows) return;
+  const tbody = document.getElementById('alerts-tbody');
+  tbody.innerHTML = '';
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-muted">No alerts recorded.</td></tr>';
+    return;
+  }
+  rows.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.created_at}</td><td>${a.device_name || a.device_id || '—'}</td>
+      <td>${a.alert_type}</td>
+      <td><span class="badge bg-${a.severity === 'high' ? 'danger' : 'warning'}">${a.severity}</span></td>
+      <td>${a.message}</td>
+      <td>${a.resolved ? '<span class="badge bg-success">resolved</span>' : '<span class="badge bg-secondary">open</span>'}</td>
+      ${role === 'admin' ? `<td>${a.resolved ? '' : `<button class="btn btn-sm btn-outline-success" onclick="resolveAlert(${a.alert_id})">Resolve</button>`}</td>` : ''}
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function resolveAlert(id) {
+  await ssemsFetch(`/api/alerts/${id}/resolve`, { method: 'POST' });
+  loadAlerts();
+}
+
+async function loadLogs() {
+  const tbody = document.getElementById('logs-tbody');
+  if (!tbody) return;
+  const rows = await ssemsFetch('/api/logs');
+  if (!rows) return;
+  tbody.innerHTML = '';
+  rows.forEach(l => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${l.created_at}</td><td>${l.actor_type}:${l.actor_id || ''}</td>
+      <td>${l.action}</td><td class="text-muted small">${l.details || ''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function refresh() { loadAlerts(); loadLogs(); }
+refresh();
+setInterval(refresh, 6000);
+</script>
+{% endblock %}
